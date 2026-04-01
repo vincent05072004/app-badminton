@@ -885,6 +885,11 @@ body {
         <div id="h-recent"></div>
       </div>
 
+      <div class="card" style="text-align: center; margin-top: 16px; background: var(--primary-light); border-color: var(--primary-mid);">
+        <h3 style="font-size: 14px; margin-bottom: 8px; color: var(--primary-dark);">Sesi Hari Ini Selesai?</h3>
+        <button class="btn btn-primary btn-full" onclick="showBestPlayerToday()">🏆 Dapatkan Hasil Hari Ini</button>
+      </div>
+
     </div>
 
     <!-- ======= PLAYERS ======= -->
@@ -1124,6 +1129,33 @@ body {
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-winner" onclick="if(event.target===this)closeWinnerModal()">
+  <div class="modal" style="text-align:center;">
+    <div class="modal-handle"></div>
+    <div style="font-size:55px; margin-bottom:5px; line-height: 1;">👑</div>
+    <div style="font-size: 14px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.1em;">Best Player of The Day</div>
+    <div id="winner-name" style="font-size: 26px; font-weight: 800; color: var(--primary); margin-top:4px;">Nama Pemain</div>
+    
+    <div style="display:flex; justify-content:center; gap:30px; margin: 24px 0; padding: 16px; background: var(--gray-50); border-radius: var(--radius-lg); border: 1px solid var(--border);">
+       <div>
+         <div id="winner-matches" style="font-size: 24px; font-weight: 800;">0</div>
+         <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Match</div>
+       </div>
+       <div>
+         <div id="winner-wr" style="font-size: 24px; font-weight: 800; color: var(--green);">0%</div>
+         <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Win Rate</div>
+       </div>
+       <div>
+         <div id="winner-wins" style="font-size: 24px; font-weight: 800; color: var(--accent);">0</div>
+         <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Menang</div>
+       </div>
+    </div>
+    
+    <div class="modal-btns">
+      <button class="btn btn-primary btn-full" onclick="closeWinnerModal()">Tutup Pengumuman</button>
+    </div>
+  </div>
+</div>
 <!-- ============================
      JAVASCRIPT
 ============================ -->
@@ -1685,6 +1717,38 @@ function confirmClearAll() {
   });
 }
 
+/* ============================
+   BEST PLAYER OF THE DAY
+============================ */
+function showBestPlayerToday() {
+  // 1. Ambil semua pertandingan hari ini
+  const todayMatches = db.matches.filter(m => isToday(m.ts));
+  
+  // 2. Cek apakah ada pertandingan
+  if (todayMatches.length === 0) {
+    alert("Belum ada pertandingan hari ini! Yuk main dulu 🏸");
+    return;
+  }
+
+  // 3. Gunakan sistem ranking yang sudah ada untuk menghitung data hari ini
+  const rank = rankingData(todayMatches);
+  
+  // Pemain di urutan pertama (index 0) adalah yang terbaik!
+  const best = rank[0]; 
+  
+  // 4. Masukkan datanya ke dalam popup
+  document.getElementById('winner-name').textContent = best.name;
+  document.getElementById('winner-matches').textContent = best.played;
+  document.getElementById('winner-wr').textContent = best.wr + '%';
+  document.getElementById('winner-wins').textContent = best.wins;
+
+  // 5. Tampilkan popup-nya
+  document.getElementById('modal-winner').classList.add('open');
+}
+
+function closeWinnerModal() {
+  document.getElementById('modal-winner').classList.remove('open');
+}
 /* ============================
    INIT
 ============================ */
