@@ -1129,6 +1129,56 @@ body {
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-profile" onclick="if(event.target===this)closeProfileModal()">
+  <div class="modal" style="max-height: 90vh; overflow-y: auto;">
+    <div class="modal-handle"></div>
+    <div class="modal-title">👤 Profil & Advanced Stats</div>
+    
+    <div class="form-group" style="margin-top: 16px; margin-bottom: 8px;">
+      <label class="form-label">Nama Pemain (Permanen)</label>
+      <input type="text" class="form-control" id="edit-p-name" disabled style="background: var(--gray-200); opacity: 0.8;">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Ubah Level</label>
+      <select class="form-control" id="edit-p-level">
+        <option value="Beginner">🟢 Beginner</option>
+        <option value="Intermediate">🟡 Intermediate</option>
+        <option value="Advanced">🟠 Advanced</option>
+        <option value="Pro">🔴 Pro</option>
+      </select>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="savePlayerLevel()">💾 Simpan Level</button>
+    
+    <div class="section-title" style="margin-top: 24px;">📊 Advanced Stats</div>
+    <div class="stat-grid" style="grid-template-columns: 1fr 1fr;">
+      <div class="stat-card" style="padding: 12px 10px;">
+        <div>
+          <div class="stat-lbl" style="font-size: 10px;">🔥 Longest Winstreak</div>
+          <div class="stat-val" id="prof-winstreak" style="font-size: 20px; color: var(--green);">0</div>
+        </div>
+      </div>
+      <div class="stat-card" style="padding: 12px 10px;">
+        <div>
+          <div class="stat-lbl" style="font-size: 10px;">🥶 Longest Losestreak</div>
+          <div class="stat-val" id="prof-losestreak" style="font-size: 20px; color: var(--red);">0</div>
+        </div>
+      </div>
+      <div class="stat-card" style="padding: 12px 10px; grid-column: span 2; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;">
+        <div class="stat-lbl" style="font-size: 10px;">🤝 Greatest Teammate (Paling sering bawa menang)</div>
+        <div class="stat-val" id="prof-teammate" style="font-size: 15px; color: var(--primary);">Loading...</div>
+      </div>
+      <div class="stat-card" style="padding: 12px 10px; grid-column: span 2; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;">
+        <div class="stat-lbl" style="font-size: 10px;">👿 Hardest Opponent (Paling sering mengalahkan)</div>
+        <div class="stat-val" id="prof-opponent" style="font-size: 15px; color: var(--red);">Loading...</div>
+      </div>
+    </div>
+
+    <div class="modal-btns" style="margin-top: 20px;">
+      <button class="btn btn-full" onclick="closeProfileModal()">Tutup Profil</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-winner" onclick="if(event.target===this)closeWinnerModal()">
   <div class="modal" style="text-align:center;">
     <div class="modal-handle"></div>
@@ -1433,7 +1483,10 @@ function renderPlayers() {
         <div class="player-meta">${st.played} played · ${st.wins}W ${st.losses}L · ${st.wr}% WR</div>
       </div>
       <span class="badge" style="background:${lv.bg};color:${lv.tx}">${p.level}</span>
-      <button class="btn btn-danger btn-sm" onclick="deletePlayer(${p.id})">🗑</button>
+      <div style="display:flex; gap:6px; margin-left: auto;">
+        <button class="btn btn-sm" style="padding: 5px 10px; background: var(--primary-light); color: var(--primary-dark); border: none;" onclick="openPlayerProfile(${p.id})">✏️ Profil</button>
+        <button class="btn btn-danger btn-sm" style="padding: 5px 10px;" onclick="deletePlayer(${p.id})">🗑</button>
+      </div>
     </div>`;
   }).join('');
 }
@@ -1748,6 +1801,92 @@ function showBestPlayerToday() {
 
 function closeWinnerModal() {
   document.getElementById('modal-winner').classList.remove('open');
+}
+
+/* ============================
+   PROFIL & ADVANCED STATS
+============================ */
+let currentEditPlayerId = null;
+
+function openPlayerProfile(id) {
+  const p = db.players.find(x => x.id === id);
+  if (!p) return;
+  currentEditPlayerId = id;
+  
+  // Isi form edit
+  document.getElementById('edit-p-name').value = p.name;
+  document.getElementById('edit-p-level').value = p.level;
+
+  // Hitung Advanced Stats
+  let currentWinStreak = 0, maxWinStreak = 0;
+  let currentLoseStreak = 0, maxLoseStreak = 0;
+  let teammateCounts = {};
+  let opponentCounts = {};
+
+  // Urutkan pertandingan dari yang paling lama ke terbaru (untuk ngitung streak)
+  const pMatches = db.matches
+    .filter(m => m.teamA.includes(p.name) || m.teamB.includes(p.name))
+    .sort((a, b) => a.ts - b.ts);
+
+  pMatches.forEach(m => {
+    const inA = m.teamA.includes(p.name);
+    const won = (inA && m.winner === 'A') || (!inA && m.winner === 'B');
+    
+    const myTeam = inA ? m.teamA : m.teamB;
+    const oppTeam = inA ? m.teamB : m.teamA;
+
+    if (won) {
+      currentWinStreak++;
+      currentLoseStreak = 0;
+      if (currentWinStreak > maxWinStreak) maxWinStreak = currentWinStreak;
+
+      // Hitung Teammate saat menang (jangan hitung diri sendiri)
+      myTeam.forEach(t => {
+        if (t !== p.name) teammateCounts[t] = (teammateCounts[t] || 0) + 1;
+      });
+    } else {
+      currentLoseStreak++;
+      currentWinStreak = 0;
+      if (currentLoseStreak > maxLoseStreak) maxLoseStreak = currentLoseStreak;
+
+      // Hitung Opponent saat kalah (Siapa yang mengalahkan dia?)
+      oppTeam.forEach(o => {
+        opponentCounts[o] = (opponentCounts[o] || 0) + 1;
+      });
+    }
+  });
+
+  // Fungsi untuk mencari nama terbanyak
+  const getTop = (counts) => {
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    return sorted.length ? `${sorted[0][0]} (${sorted[0][1]}x match)` : 'Belum Ada Data';
+  };
+
+  // Tampilkan ke layar
+  document.getElementById('prof-winstreak').textContent = maxWinStreak;
+  document.getElementById('prof-losestreak').textContent = maxLoseStreak;
+  document.getElementById('prof-teammate').textContent = getTop(teammateCounts);
+  document.getElementById('prof-opponent').textContent = getTop(opponentCounts);
+
+  // Buka Modal
+  document.getElementById('modal-profile').classList.add('open');
+}
+
+function closeProfileModal() {
+  document.getElementById('modal-profile').classList.remove('open');
+  currentEditPlayerId = null;
+}
+
+function savePlayerLevel() {
+  if (!currentEditPlayerId) return;
+  const p = db.players.find(x => x.id === currentEditPlayerId);
+  if (p) {
+    p.level = document.getElementById('edit-p-level').value;
+    save(); // Kirim data terbaru ke Firebase
+    renderPlayers(); // Update tampilan
+    closeProfileModal();
+    showAlert('alert-player', `✅ Level ${p.name} berhasil diubah!`, 'success');
+  }
 }
 /* ============================
    INIT
